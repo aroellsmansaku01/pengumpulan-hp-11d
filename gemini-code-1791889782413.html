@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistem Pengumpulan HP Siswa - Kelas 11-D</title>
+  <!-- Library QR Code Scanner & Generator -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <!-- Library Generate PDF & Table -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+    body { background-color: #f4f8f5; margin: 0; padding: 15px; text-align: center; color: #1c1e21; }
+    .container { max-width: 550px; margin: auto; background: #ffffff; padding: 24px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    
+    /* Header Tema Hijau & Kuning */
+    .header-box {
+      background: linear-gradient(135deg, #1b5e20, #2e7d32);
+      color: #fffde7;
+      padding: 16px;
+      border-radius: 10px;
+      border-bottom: 4px solid #fbc02d;
+      margin-bottom: 20px;
+    }
+    .header-box h2 { color: #ffeb3b; margin: 0 0 4px 0; text-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+    .header-box p { font-size: 13px; margin: 0; color: #f0f4c3; }
+
+    /* Tombol Tema Hijau & Kuning */
+    .btn { background: #2e7d32; color: white; border: none; padding: 10px 16px; font-size: 13px; border-radius: 8px; cursor: pointer; margin: 4px; font-weight: 600; transition: background 0.2s; }
+    .btn:hover { background: #1b5e20; }
+    .btn:disabled { background: #a5d6a7; cursor: not-allowed; opacity: 0.7; }
+    .btn-yellow { background: #fbc02d; color: #212121; }
+    .btn-yellow:hover { background: #f57f17; color: #fff; }
+    .btn-danger { background: #d32f2f; }
+    .btn-danger:hover { background: #b71c1c; }
+    .btn-secondary { background: #616161; }
+    .btn-secondary:hover { background: #424242; }
+
+    input { padding: 12px; width: 100%; margin: 8px 0; border: 1px solid #c8e6c9; border-radius: 8px; font-size: 14px; outline: none; background: #fff; }
+    input:focus { border-color: #2e7d32; }
+    #reader { width: 100%; margin-top: 15px; border-radius: 8px; overflow: hidden; background: #000; }
+    
+    /* Status Notifikasi Terdaftar */
+    .notif-box {
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: bold;
+      margin-top: 10px;
+      text-align: left;
+      display: none;
+      line-height: 1.4;
+    }
+    .notif-success { background-color: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+    .notif-error { background-color: #ffebee; color: #b71c1c; border: 1px solid #ef9a9a; }
+
+    /* Tabel Rekap */
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
+    th, td { border: 1px solid #e0e0e0; padding: 8px 5px; text-align: center; }
+    th { background: #1b5e20; color: #ffeb3b; font-weight: 600; }
+    
+    .status-on-time { color: #2e7d32; font-weight: bold; background: #e8f5e9; padding: 4px 6px; border-radius: 4px; }
+    .status-late { color: #c62828; font-weight: bold; background: #ffebee; padding: 4px 6px; border-radius: 4px; }
+    .hidden { display: none; }
+    #qrcode canvas { margin-top: 10px; border: 2px solid #fbc02d; padding: 10px; border-radius: 8px; background: #fff; }
+    .card { background: #f1f8e9; padding: 15px; border-radius: 8px; border: 1px solid #c8e6c9; margin-bottom: 15px; text-align: left; }
+
+    /* Layout Khusus Cetak QR */
+    @media print {
+      body * { visibility: hidden; }
+      #printable-qr-card, #printable-qr-card * { visibility: visible; }
+      #printable-qr-card {
+        position: absolute;
+        left: 50%;
+        top: 20%;
+        transform: translate(-50%, 0);
+        width: 80%;
+        border: 3px solid #2e7d32;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        background: #fff;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header Hijau & Akses Kuning -->
+  <div class="header-box">
+    <h2>Aplikasi Pengumpulan HP</h2>
+    <p>Sistem Presensi HP Siswa - Kelas 11-D</p>
+  </div>
+
+  <!-- Pilihan Peran -->
+  <div id="role-section">
+    <p style="font-weight: 500;">Pilih Peran Pengguna:</p>
+    <button class="btn" onclick="showMode('siswa')">Mode Siswa (Scan QR)</button>
+    <button class="btn btn-yellow" onclick="accessGuruMode()">🔒 Mode Guru (Cetak QR & Rekap)</button>
+  </div>
+
+  <!-- MODE SISWA -->
+  <div id="siswa-section" class="hidden">
+    <h3 style="color: #2e7d32;">Pengumpulan HP Siswa</h3>
+    <div class="card">
+      <label style="font-size: 12px; font-weight: bold; color: #1b5e20;">Nama Lengkap Siswa:</label>
+      <input type="text" id="nama-siswa" placeholder="Ketik Nama Lengkap Sesuai Absen" oninput="validateSiswaData()" list="list-nama">
+      <datalist id="list-nama"></datalist>
+
+      <label style="font-size: 12px; font-weight: bold; color: #1b5e20; margin-top: 5px; display: block;">NIS / NISN Siswa:</label>
+      <input type="text" id="nisn-siswa" placeholder="Ketik NIS / NISN" oninput="validateSiswaData()">
+
+      <!-- Notifikasi Status Pengecekan -->
+      <div id="notif-status" class="notif-box"></div>
+    </div>
+
+    <div id="reader"></div>
+    <div id="scan-result"></div>
+  </div>
+
+  <!-- MODE GURU -->
+  <div id="guru-section" class="hidden">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="color: #2e7d32; margin: 0;">Panel Kontrol Guru</h3>
+      <button class="btn btn-secondary" style="font-size: 11px; padding: 6px 10px;" onclick="changePassword()">🔑 Ganti Password</button>
+    </div>
+    
+    <div class="card" style="margin-top: 15px;">
+      <label style="font-size: 13px; font-weight: bold; color: #1b5e20;">Atur Batas Waktu Pengumpulan:</label>
+      <input type="time" id="deadline-time" value="07:15" onchange="updateLiveDeadline()">
+      <button class="btn btn-yellow" style="width: 100%; margin: 8px 0 0 0;" onclick="generateQRCode()">Buat & Tampilkan QR Code</button>
+    </div>
+
+    <!-- Container QR Code Siap Cetak -->
+    <div id="qr-container" class="hidden card" style="text-align: center;">
+      <div id="printable-qr-card">
+        <h3 style="margin: 0; color: #1b5e20;">POS PENGUMPULAN HP SISWA</h3>
+        <p style="margin: 4px 0 10px 0; font-size: 12px; color: #555;">Batas Waktu Pengumpulan: <b id="display-deadline" style="color: #d32f2f;">07:15 WITA</b></p>
+        <div id="qrcode"></div>
+        <p style="font-size: 11px; color: #333; margin-top: 10px; font-weight: bold;">
+          Petunjuk: Buka Aplikasi HP -> Isi Nama & NISN -> Scan QR Code Ini
+        </p>
+      </div>
+
+      <!-- Tombol Aksi Unduh & Cetak QR -->
+      <div style="margin-top: 15px; display: flex; gap: 8px; justify-content: center;">
+        <button class="btn" style="font-size: 12px; background: #fbc02d; color: #212121;" onclick="downloadQRImage()">Unduh Gambar (PNG)</button>
+        <button class="btn" style="font-size: 12px; background: #2e7d32;" onclick="printQRCode()">Cetak / Print PDF</button>
+      </div>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #c8e6c9; margin: 20px 0;">
+    <h4 style="margin-bottom: 8px; color: #1b5e20;">Rekapitulasi Pengumpulan (Berurutan Abjad)</h4>
+    
+    <!-- Tombol Unduh Laporan PDF -->
+    <div style="background: #e8f5e9; padding: 10px; border-radius: 8px; margin-bottom: 12px;">
+      <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: bold; color: #1b5e20;">📄 Unduh Laporan PDF:</p>
+      <button class="btn btn-yellow" style="font-size: 11px;" onclick="exportPDF('harian')">Hari Ini</button>
+      <button class="btn btn-yellow" style="font-size: 11px;" onclick="exportPDF('mingguan')">Mingguan (7 Hari)</button>
+      <button class="btn btn-yellow" style="font-size: 11px;" onclick="exportPDF('bulanan')">Bulanan</button>
+      <button class="btn btn-secondary" style="font-size: 11px;" onclick="exportToCSV()">Unduh CSV/Excel</button>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+      <button class="btn btn-danger" style="font-size: 11px;" onclick="clearData()">Hapus Semua Rekap</button>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Nama Siswa (A-Z)</th>
+            <th>NISN</th>
+            <th>Tanggal / Waktu</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="rekap-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <br>
+  <button class="btn btn-secondary" style="margin-top: 15px;" onclick="resetMode()">Kembali ke Menu Utama</button>
+</div>
+
+<script>
+  // DATABASE SISWA KELAS 11-D DARI FILE EXCEL (34 SISWA)
+  const DATABASE_SISWA = [
+    { nis: "93398926", nama: "Achmad Aril Nur Febriansah", kelas: "11-D" },
+    { nis: "106804907", nama: "Acintya Msyithah Rahmad", kelas: "11-D" },
+    { nis: "103055184", nama: "Afifah Nur Zahra Amalia", kelas: "11-D" },
+    { nis: "104097255", nama: "Aira Nur Fadia", kelas: "11-D" },
+    { nis: "104560802", nama: "Alin Elsya Anggaeni", kelas: "11-D" },
+    { nis: "101301785", nama: "Alya Nabila Anwar", kelas: "11-D" },
+    { nis: "103755877", nama: "Amelia Azzahra", kelas: "11-D" },
+    { nis: "104508642", nama: "Antanasius Rafliano Putra", kelas: "11-D" },
+    { nis: "97825614", nama: "Ariqah Nur Assyifa", kelas: "11-D" },
+    { nis: "108887763", nama: "Avyan Irsyad Dyanmehra", kelas: "11-D" },
+    { nis: "99838546", nama: "Ayu Syifa Lestari", kelas: "11-D" },
+    { nis: "97615473", nama: "Dafa Rizky Adtya", kelas: "11-D" },
+    { nis: "92607551", nama: "Eliza Adhalita Novera", kelas: "11-D" },
+    { nis: "97241975", nama: "Febby Mauluddina", kelas: "11-D" },
+    { nis: "102749071", nama: "Herni", kelas: "11-D" },
+    { nis: "107772794", nama: "Jasmine Admiria Putri Tella", kelas: "11-D" },
+    { nis: "82190874", nama: "Kelvin Aldiansyah", kelas: "11-D" },
+    { nis: "95141217", nama: "Lusia  Febriana Dua Odang", kelas: "11-D" },
+    { nis: "101575810", nama: "Maria Rosvita Yuliarti", kelas: "11-D" },
+    { nis: "99458358", nama: "Muhammad Abdul Khairi", kelas: "11-D" },
+    { nis: "103923947", nama: "Muhammad Gafar Pradana", kelas: "11-D" },
+    { nis: "106497837", nama: "Muhammad Ikhsan Pratama", kelas: "11-D" },
+    { nis: "105046942", nama: "Muhammad Kamil Ammar", kelas: "11-D" },
+    { nis: "104278233", nama: "Nadhif Alim Dhiyaul Haq", kelas: "11-D" },
+    { nis: "109931802", nama: "Reny Widyastuti", kelas: "11-D" },
+    { nis: "102928707", nama: "Revi Bagus Dwi Prasetyo", kelas: "11-D" },
+    { nis: "94631426", nama: "Sakinah Novi Abidah", kelas: "11-D" },
+    { nis: "108080940", nama: "Syifa Khoufi Sugita", kelas: "11-D" },
+    { nis: "91347612", nama: "Synta Wahdini", kelas: "11-D" },
+    { nis: "87290475", nama: "Uddin", kelas: "11-D" },
+    { nis: "109573742", nama: "Wildan Jhetaristo Putratama", kelas: "11-D" },
+    { nis: "104746228", nama: "Wina Junita", kelas: "11-D" },
+    { nis: "109771223", nama: "Yolani Kristin", kelas: "11-D" },
+    { nis: "106634661", nama: "Zefany Nada Rahmadani", kelas: "11-D" }
+  ];
+
+  let html5QrcodeScanner = null;
+  let isSiswaValid = false;
+  let verifiedSiswaData = null;
+
+  window.onload = function() {
+    const dataList = document.getElementById('list-nama');
+    DATABASE_SISWA.forEach(s => {
+      const option = document.createElement('option');
+      option.value = s.nama;
+      dataList.appendChild(option);
+    });
+  };
+
+  function cleanText(str) {
+    return str.toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+
+  // VALIDASI DATA SISWA & OTOMATIS AKTIFKAN KAMERA
+  function validateSiswaData() {
+    const inputNama = cleanText(document.getElementById('nama-siswa').value);
+    const inputNisn = document.getElementById('nisn-siswa').value.trim();
+    const notifBox = document.getElementById('notif-status');
+
+    if (inputNama === "" && inputNisn === "") {
+      notifBox.style.display = 'none';
+      stopCamera();
+      isSiswaValid = false;
+      return;
+    }
+
+    let exactMatch = DATABASE_SISWA.find(s => 
+      s.nis === inputNisn && cleanText(s.nama) === inputNama
+    );
+
+    if (!exactMatch && inputNisn !== "") {
+      const nisMatch = DATABASE_SISWA.find(s => s.nis === inputNisn);
+      if (nisMatch && (inputNama === "" || cleanText(nisMatch.nama).includes(inputNama))) {
+        exactMatch = nisMatch;
+        document.getElementById('nama-siswa').value = nisMatch.nama;
+      }
+    }
+
+    if (!exactMatch && inputNama !== "") {
+      const namaMatch = DATABASE_SISWA.find(s => cleanText(s.nama) === inputNama);
+      if (namaMatch && (inputNisn === "" || namaMatch.nis === inputNisn)) {
+        exactMatch = namaMatch;
+        document.getElementById('nisn-siswa').value = namaMatch.nis;
+      }
+    }
+
+    notifBox.style.display = 'block';
+
+    if (exactMatch) {
+      notifBox.className = "notif-box notif-success";
+      notifBox.innerHTML = `
+        <div style="font-size: 14px; margin-bottom: 3px;">✓ <b>TERDAFTAR DI SISTEM</b></div>
+        <div>Nama Resmi: <b>${exactMatch.nama}</b></div>
+        <div>NIS/NISN: <b>${exactMatch.nis}</b> | Kelas: <b>${exactMatch.kelas}</b></div>
+        <div style="margin-top: 5px; font-weight: normal; color: #2e7d32;">📷 <i>Kamera langsung aktif otomatis di bawah ini...</i></div>
+      `;
+      isSiswaValid = true;
+      verifiedSiswaData = exactMatch;
+      
+      // MENGAKTIFKAN KAMERA SECARA OTOMATIS BEGITU TERDAFTAR
+      startAutoCameraScanner();
+    } else {
+      notifBox.className = "notif-box notif-error";
+      notifBox.innerHTML = `
+        <div style="font-size: 14px; margin-bottom: 3px;">✕ <b>TIDAK TERDAFTAR</b></div>
+        <div style="font-weight: normal; font-size: 12px;">Nama atau NISN tidak cocok dengan data Kelas 11-D. Pastikan penulisan sesuai data resmi.</div>
+      `;
+      stopCamera();
+      isSiswaValid = false;
+      verifiedSiswaData = null;
+    }
+  }
+
+  function getStoredPassword() {
+    return localStorage.getItem('guru_password') || 'guru123';
+  }
+
+  function accessGuruMode() {
+    const inputPass = prompt("🔑 Masukkan Password Guru untuk Mengakses Mode Guru:");
+    if (inputPass === null) return;
+
+    if (inputPass.trim() === getStoredPassword()) {
+      showMode('guru');
+    } else {
+      alert("⚠️ Password salah! Akses ditolak.");
+    }
+  }
+
+  function changePassword() {
+    const currentPass = prompt("Masukkan Password Lama:");
+    if (currentPass === null) return;
+
+    if (currentPass.trim() !== getStoredPassword()) {
+      alert("Password lama salah!");
+      return;
+    }
+
+    const newPass = prompt("Masukkan Password Baru:");
+    if (newPass && newPass.trim() !== "") {
+      localStorage.setItem('guru_password', newPass.trim());
+      alert("Password berhasil diubah!");
+    } else {
+      alert("Password tidak boleh kosong!");
+    }
+  }
+
+  function showMode(mode) {
+    document.getElementById('role-section').classList.add('hidden');
+    if (mode === 'siswa') {
+      document.getElementById('siswa-section').classList.remove('hidden');
+    } else if (mode === 'guru') {
+      document.getElementById('guru-section').classList.remove('hidden');
+      updateLiveDeadline();
+      loadRekap();
+    }
+  }
+
+  function resetMode() {
+    stopCamera();
+    document.getElementById('role-section').classList.remove('hidden');
+    document.getElementById('siswa-section').classList.add('hidden');
+    document.getElementById('guru-section').classList.add('hidden');
+  }
+
+  function stopCamera() {
+    if (html5QrcodeScanner) {
+      html5QrcodeScanner.clear().catch(e => console.error(e));
+      html5QrcodeScanner = null;
+    }
+  }
+
+  function getTimeZoneLabel() {
+    const offset = new Date().getTimezoneOffset();
+    if (offset === -480) return "WITA";
+    if (offset === -420) return "WIB";
+    if (offset === -540) return "WIT";
+    return "";
+  }
+
+  function updateLiveDeadline() {
+    const deadlineValue = document.getElementById('deadline-time').value;
+    const timeZone = getTimeZoneLabel();
+    const displayElement = document.getElementById('display-deadline');
+    if (displayElement) {
+      displayElement.innerText = deadlineValue + (timeZone ? " " + timeZone : "");
+    }
+  }
+
+  // MANAJEMEN GURU
+  function generateQRCode() {
+    const deadline = document.getElementById('deadline-time').value;
+    const qrContainer = document.getElementById('qr-container');
+    const qrDiv = document.getElementById('qrcode');
+    updateLiveDeadline();
+    qrDiv.innerHTML = "";
+
+    const payload = JSON.stringify({
+      session: "PENGUMPULAN_HP",
+      deadline: deadline,
+      date: new Date().toISOString().split('T')[0]
+    });
+
+    QRCode.toCanvas(payload, { width: 220 }, function (error, canvas) {
+      if (error) console.error(error);
+      qrDiv.appendChild(canvas);
+      qrContainer.classList.remove('hidden');
+    });
+  }
+
+  function downloadQRImage() {
+    const canvas = document.querySelector("#qrcode canvas");
+    if (!canvas) {
+      alert("Buat QR Code terlebih dahulu!");
+      return;
+    }
+    const imageURI = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = imageURI;
+    link.download = `QR_Pengumpulan_HP_${document.getElementById('deadline-time').value}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function printQRCode() {
+    window.print();
+  }
+
+  // REKAP DENGAN PENGURUTAN ABJAD A-Z
+  function loadRekap() {
+    const tbody = document.getElementById('rekap-body');
+    tbody.innerHTML = "";
+    let records = JSON.parse(localStorage.getItem('hp_collection_rekap') || '[]');
+
+    if(records.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" style="color: #888;">Belum ada data pengumpulan</td></tr>`;
+      return;
+    }
+
+    records.sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+
+    records.forEach((item, index) => {
+      const tr = document.createElement('tr');
+      const isLate = item.status.includes('Terlambat');
+      const statusSpan = !isLate 
+        ? `<span class="status-on-time">Tepat Waktu</span>` 
+        : `<span class="status-late">Terlambat (-5 Poin)</span>`;
+      
+      const tanggalFormat = item.tanggal ? `${item.tanggal} (${item.waktu})` : item.waktu;
+
+      tr.innerHTML = `
+        <td>${index + 1}</td>
+        <td style="text-align: left; font-weight: 500;">${item.nama}</td>
+        <td>${item.nisn}</td>
+        <td>${tanggalFormat}</td>
+        <td>${statusSpan}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function clearData() {
+    if (confirm("Apakah Anda yakin ingin menghapus seluruh data rekapitulasi?")) {
+      localStorage.removeItem('hp_collection_rekap');
+      loadRekap();
+    }
+  }
+
+  function exportToCSV() {
+    let records = JSON.parse(localStorage.getItem('hp_collection_rekap') || '[]');
+    if (records.length === 0) {
+      alert("Belum ada data rekapitulasi untuk diunduh.");
+      return;
+    }
+
+    records.sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+
+    let csvContent = "data:text/csv;charset=utf-8,No,Nama Siswa,NISN,Tanggal,Waktu,Status\n";
+    records.forEach((r, idx) => {
+      csvContent += `"${idx + 1}","${r.nama}","${r.nisn}","${r.tanggal || ''}","${r.waktu}","${r.status}"\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `rekap_pengumpulan_hp_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // EKSPOR LAPORAN PDF
+  function exportPDF(periode) {
+    const { jsPDF } = window.jspdf;
+    let records = JSON.parse(localStorage.getItem('hp_collection_rekap') || '[]');
+
+    if (records.length === 0) {
+      alert("Belum ada data rekapitulasi untuk dicetak ke PDF.");
+      return;
+    }
+
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    let filteredRecords = [];
+    let judulPeriode = "";
+
+    if (periode === 'harian') {
+      judulPeriode = `Laporan Harian (${todayStr})`;
+      filteredRecords = records.filter(r => r.tanggal === todayStr);
+    } else if (periode === 'mingguan') {
+      const semingguLalu = new Date();
+      semingguLalu.setDate(today.getDate() - 7);
+      judulPeriode = `Laporan Mingguan (7 Hari Terakhir)`;
+      filteredRecords = records.filter(r => new Date(r.tanggal) >= semingguLalu);
+    } else if (periode === 'bulanan') {
+      const bulanIni = today.toISOString().slice(0, 7);
+      judulPeriode = `Laporan Bulanan (${bulanIni})`;
+      filteredRecords = records.filter(r => r.tanggal && r.tanggal.startsWith(bulanIni));
+    }
+
+    if (filteredRecords.length === 0) {
+      alert(`Tidak ada data pengumpulan HP untuk periode ${judulPeriode}.`);
+      return;
+    }
+
+    filteredRecords.sort((a, b) => a.nama.localeCompare(b.nama, 'id', { sensitivity: 'base' }));
+
+    const doc = new jsPDF();
+
+    doc.setFillColor(27, 94, 32);
+    doc.rect(0, 0, 210, 25, 'F');
+    doc.setTextColor(255, 235, 59);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("REKAPITULASI PENGUMPULAN HP SISWA KELAS 11-D", 105, 12, { align: "center" });
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(judulPeriode, 105, 19, { align: "center" });
+
+    const tepatWaktuCount = filteredRecords.filter(r => !r.status.includes('Terlambat')).length;
+    const terlambatCount = filteredRecords.filter(r => r.status.includes('Terlambat')).length;
+
+    doc.setTextColor(33, 33, 33);
+    doc.setFontSize(10);
+    doc.text(`Total Pengumpulan : ${filteredRecords.length} Siswa`, 14, 33);
+    doc.text(`Tepat Waktu : ${tepatWaktuCount} Siswa | Terlambat : ${terlambatCount} Siswa`, 14, 39);
+
+    const tableData = filteredRecords.map((r, index) => [
+      index + 1,
+      r.nama,
+      r.nisn,
+      r.tanggal || todayStr,
+      r.waktu,
+      r.status
+    ]);
+
+    doc.autoTable({
+      startY: 44,
+      head: [['No', 'Nama Siswa (A-Z)', 'NISN', 'Tanggal', 'Waktu', 'Status']],
+      body: tableData,
+      headStyles: { fillStyle: 'F', fillColor: [27, 94, 32], textColor: [255, 235, 59], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [241, 248, 233] },
+      styles: { fontSize: 9, halign: 'center' },
+      columnStyles: {
+        1: { halign: 'left' }
+      }
+    });
+
+    const nowStr = new Date().toLocaleString('id-ID');
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text(`Dicetak pada: ${nowStr}`, 14, doc.internal.pageSize.height - 10);
+
+    doc.save(`Rekap_HP_11D_${periode}_${todayStr}.pdf`);
+  }
+
+  // MEMBUKA KAMERA SECARA OTOMATIS
+  function startAutoCameraScanner() {
+    if (!isSiswaValid || !verifiedSiswaData || html5QrcodeScanner !== null) {
+      return;
+    }
+
+    html5QrcodeScanner = new Html5QrcodeScanner("reader", { 
+      fps: 15, 
+      qrbox: { width: 220, height: 220 },
+      videoConstraints: {
+        facingMode: { ideal: "environment" }
+      }
+    });
+
+    html5QrcodeScanner.render(
+      (decodedText) => onScanSuccess(decodedText, verifiedSiswaData),
+      (errorMessage) => {}
+    );
+  }
+
+  function onScanSuccess(decodedText, dataSiswa) {
+    try {
+      const data = JSON.parse(decodedText);
+      if (data.session === "PENGUMPULAN_HP") {
+        stopCamera();
+
+        const now = new Date();
+        const currentTime = now.toTimeString().split(' ')[0].substring(0, 5);
+        const deadline = data.deadline;
+
+        const isLate = currentTime > deadline;
+        const timeZoneLabel = getTimeZoneLabel();
+        const deadlineText = deadline + (timeZoneLabel ? " " + timeZoneLabel : "");
+        
+        const status = isLate ? "Terlambat (-5 Poin)" : "Tepat Waktu";
+        const waktuStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const tanggalStr = now.toISOString().split('T')[0];
+
+        const newRecord = {
+          nama: dataSiswa.nama,
+          nisn: dataSiswa.nis,
+          tanggal: tanggalStr,
+          waktu: waktuStr,
+          status: status
+        };
+
+        let records = JSON.parse(localStorage.getItem('hp_collection_rekap') || '[]');
+        records.push(newRecord);
+        localStorage.setItem('hp_collection_rekap', JSON.stringify(records));
+
+        const resultDiv = document.getElementById('scan-result');
+        const bgColor = isLate ? '#ffebee' : '#e8f5e9';
+        const textColor = isLate ? '#c62828' : '#2e7d32';
+        const borderColor = isLate ? '#ef9a9a' : '#a5d6a7';
+        
+        let messageContent = "";
+        if (isLate) {
+          messageContent = `
+            <h3 style="margin-top: 0; color: #b71c1c;">⚠️ Pengumpulan Terlambat!</h3>
+            <p style="margin: 6px 0; font-size: 14px;">Siswa: <b>${dataSiswa.nama}</b></p>
+            <p style="margin: 6px 0; font-size: 14px;">Batas waktu pengumpulan adalah pukul <b>${deadlineText}</b>.</p>
+            <p style="margin: 8px 0 4px 0; font-size: 14px; font-weight: bold; background: #ffcdd2; padding: 8px; border-radius: 6px; color: #b71c1c;">
+              🚨 Anda terkena 5 poin pelanggaran aturan sekolah.
+            </p>
+            <p style="margin-top: 10px; font-size: 12px;">Waktu Scan: ${waktuStr} | Silakan letakkan HP Anda di tempat yang disediakan guru.</p>
+          `;
+        } else {
+          messageContent = `
+            <h3 style="margin-top: 0;">✓ Pengumpulan Berhasil!</h3>
+            <p style="margin: 5px 0;">Siswa: <b>${dataSiswa.nama}</b></p>
+            <p style="margin: 5px 0;">Status: <b>Tepat Waktu</b> (${waktuStr})</p>
+            <p style="margin: 5px 0; font-size: 13px;">Silakan letakkan HP Anda di tempat yang disediakan guru.</p>
+          `;
+        }
+
+        resultDiv.innerHTML = `
+          <div style="background: ${bgColor}; color: ${textColor}; padding: 18px; border-radius: 8px; margin-top: 15px; border: 1px solid ${borderColor}; text-align: left;">
+            ${messageContent}
+          </div>
+        `;
+      } else {
+        alert("QR Code tidak dikenali sebagai QR Pengumpulan HP.");
+      }
+    } catch (e) {
+      alert("Format QR Code tidak valid.");
+    }
+  }
+</script>
+
+</body>
+</html>
